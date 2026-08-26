@@ -2,32 +2,57 @@ terraform {
   required_version = ">= 1.4"
 
   required_providers {
-    external = {
-      source  = "hashicorp/external"
-      version = "~> 2.3"
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
     }
   }
 }
 
-# Reads a plain workspace env_var. Terraform can only see env vars natively when
-# they are TF_VAR_-prefixed, so this proves non-prefixed env_vars reach the pod.
-data "external" "env_probe" {
-  program = ["sh", "-c", "printf '{\"sample_env\":\"%s\"}' \"$SAMPLE_ENV\""]
+# Deliberately empty: the provider picks up AWS_ACCESS_KEY_ID,
+# AWS_SECRET_ACCESS_KEY (and AWS_SESSION_TOKEN if present) plus AWS_REGION
+# from the workspace environment variables.
+provider "aws" {}
+
+# Reports which account the run actually authenticated as. This is the check
+# that matters for the issue you're chasing — if `aws_account_id` comes back as
+# Atmosly's account, the env-var credentials did not take effect and it fell
+# through to the pod's IRSA identity.
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
+locals {
+  # Bucket names are globally unique; the account ID keeps this collision-free
+  # and doubles as proof of which account the bucket landed in.
+  bucket_name = "${var.bucket_name_prefix}-${data.aws_caller_identity.current.account_id}"
 }
 
-# terraform_data is built into Terraform >= 1.4 — no cloud provider, no credentials,
-# no real resource. It still lands in state, so state upload and the Outputs /
-# Associated Resources tabs all get exercised.
-resource "terraform_data" "deployment" {
-  input = {
-    app         = var.app_name
-    environment = var.environment
-    replicas    = var.replica_count
-    env_value   = data.external.env_probe.result["sample_env"]
+resource "aws_s3_bucket" "this" {
+  bucket = local.bucket_name
+
+  # Test bucket — lets `terraform destroy` succeed even if objects exist.
+  force_destroy = true
+
+  tags = merge(var.tags, {
+    Name      = local.bucket_name
+    ManagedBy = "atmosly-infra-workflow"
+  })
+}
+
+resource "aws_s3_bucket_public_access_block" "this" {
+  bucket                  = aws_s3_bucket.this.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
+  bucket = aws_s3_bucket.this.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
   }
-}
-
-resource "terraform_data" "replica" {
-  count = var.replica_count
-  input = "${var.app_name}-${var.environment}-${count.index}"
 }
