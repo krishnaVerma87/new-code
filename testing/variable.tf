@@ -1,24 +1,15 @@
-# Required — no default. Omit these from the workspace tf_vars and the run
-# fails fast with "No value for required variable", which is itself a useful test.
-variable "app_name" {
-  description = "Logical application name"
+variable "bucket_name_prefix" {
+  description = "Prefix for the bucket name; the AWS account ID is appended to keep it globally unique"
   type        = string
-}
 
-variable "environment" {
-  description = "Deployment environment (dev/stage/prod)"
-  type        = string
-}
-
-# Optional — has a default, so it works whether or not you set a tf_var.
-variable "replica_count" {
-  description = "Number of replicas to simulate"
-  type        = number
-  default     = 2
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9-]{1,40}$", var.bucket_name_prefix))
+    error_message = "Lowercase letters, digits and hyphens only, starting with a letter or digit."
+  }
 }
 
 variable "tags" {
-  description = "Arbitrary key/value tags"
+  description = "Extra tags applied to the bucket"
   type        = map(string)
   default     = {}
 }
