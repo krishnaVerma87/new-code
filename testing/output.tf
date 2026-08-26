@@ -1,26 +1,24 @@
-output "app_name" {
-  description = "Value received from the tf_var"
-  value       = var.app_name
+output "aws_account_id" {
+  description = "Account the run authenticated as — verify this is YOUR account, not Atmosly's"
+  value       = data.aws_caller_identity.current.account_id
 }
 
-output "environment" {
-  value = var.environment
+output "aws_region" {
+  description = "Region the provider resolved from AWS_REGION"
+  value       = data.aws_region.current.name
 }
 
-output "replica_names" {
-  description = "One entry per replica — proves count/state worked"
-  value       = [for r in terraform_data.replica : r.output]
+output "bucket_name" {
+  description = "Name of the created bucket"
+  value       = aws_s3_bucket.this.id
 }
 
-output "sample_env_from_env_var" {
-  description = "Value read from the SAMPLE_ENV workspace env_var"
-  value       = data.external.env_probe.result["sample_env"]
+output "bucket_arn" {
+  description = "ARN of the created bucket"
+  value       = aws_s3_bucket.this.arn
 }
 
-output "tags" {
-  value = var.tags
-}
-
-output "smoke" {
-  value = "infra-workflow pipeline OK"
+output "bucket_domain_name" {
+  description = "Regional domain name of the created bucket"
+  value       = aws_s3_bucket.this.bucket_regional_domain_name
 }
