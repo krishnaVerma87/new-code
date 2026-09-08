@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: inventory-app
+    app.kubernetes.io/managed-by: atmosly
+    app.kubernetes.io/name: inventory-app
+    app.kubernetes.io/version: 1.27.0
+    component: backend
+    cost_center: platform_team
+    environment: development
+    release.version: v1.2.3
+    tier-1: api-gateway
+  name: inventory-deployment
+spec:
+  progressDeadlineSeconds: 600
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: inventory-app
+      component: backend
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: inventory-app
+        app.kubernetes.io/managed-by: atmosly
+        app.kubernetes.io/name: inventory-app
+        app.kubernetes.io/version: 1.27.0
+        component: backend
+        cost_center: platform_team
+        environment: development
+        release.version: v1.2.3
+        tier: api
+        tier-1: api-gateway
+    spec:
+      containers:
+      - image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: IfNotPresent
+        name: nginx
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
